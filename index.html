@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>급똥 레이더</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="열자마자 내 주변에서 가장 가까운 화장실을 찾아 줍니다.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: sky-blue field, one big white "nearest toilet" card up top, a short list of runners-up under it */
+:root {
+  --sky: #a9d4f5;
+  --sky-2: #d4ebfb;
+  --card: #ffffff;
+  --inner: #f3f8fd;
+  --ink: #12304f;
+  --muted: #5d7590;
+  --blue: #1f6fbf;
+  --blue-soft: #e3f0fb;
+  --blue-ink: #ffffff;
+  --yellow: #ffd45c;
+  --green: #1c8a4a;
+  --green-soft: #e4f5ea;
+  --red: #c4423a;
+  --red-soft: #fbe8e6;
+  --line: #d3e4f3;
+  --display: "Jua", "Noto Sans KR", system-ui, sans-serif;
+  --body: "Noto Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sky: #0d2236; --sky-2: #12304a; --card: #162a3e; --inner: #1b334b; --ink: #e7f1fb; --muted: #9fb6cc;
+    --blue: #5aa7ee; --blue-soft: #1e3b57; --blue-ink: #08182a; --yellow: #f2c44a;
+    --green: #5fd08f; --green-soft: #18392a; --red: #f08a82; --red-soft: #3d2222; --line: #2a4560;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --sky: #0d2236; --sky-2: #12304a; --card: #162a3e; --inner: #1b334b; --ink: #e7f1fb; --muted: #9fb6cc;
+  --blue: #5aa7ee; --blue-soft: #1e3b57; --blue-ink: #08182a; --yellow: #f2c44a;
+  --green: #5fd08f; --green-soft: #18392a; --red: #f08a82; --red-soft: #3d2222; --line: #2a4560;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--sky-2);
+  background-image: linear-gradient(180deg, var(--sky) 0, var(--sky-2) 520px);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.wrap {
+  max-width: 480px; margin: 0 auto;
+  padding-block: 22px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 16px;
+}
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: grid; gap: 6px; min-width: 0; }
+.pill { justify-self: start; background: var(--ink); color: var(--yellow); font-weight: 700; font-size: 12px; padding: 4px 12px; border-radius: 999px; }
+h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 32px; line-height: 1.15; text-wrap: balance; }
+h1 mark { background: var(--yellow); color: #12304f; padding: 0 8px; border-radius: 8px; border: 2px solid #12304f; }
+.mascot { width: 92px; height: 72px; flex: none; }
+
+.card { background: var(--card); border-radius: 24px; padding: 18px; box-shadow: 0 10px 30px rgba(18, 48, 79, .12); }
+.best { border: 2.5px solid var(--blue); background: var(--card); border-radius: 18px; padding: 16px; display: grid; gap: 10px; }
+.toprow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.from { display: flex; align-items: center; gap: 6px; color: var(--blue); font-weight: 700; font-size: 13px; }
+.from svg { width: 22px; height: 22px; }
+.retry { font: inherit; font-size: 13px; font-weight: 500; color: var(--muted); background: none; border: 0; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 8px; }
+.retry svg { width: 16px; height: 16px; }
+.name { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.name h2 { margin: 0; font-size: 22px; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+.tag { font-size: 12px; font-weight: 500; background: var(--blue-soft); color: var(--blue); padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+.dist { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 700; }
+.dist .m { color: var(--blue); font-size: 18px; font-variant-numeric: tabular-nums; }
+.dist .walk { color: var(--muted); font-weight: 500; font-size: 13px; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1.5px solid currentColor; }
+.status.open { color: var(--green); background: var(--green-soft); }
+.status.closed { color: var(--red); background: var(--red-soft); }
+.status.unknown { color: var(--muted); background: var(--inner); }
+.status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.addr { font-size: 13px; color: var(--muted); }
+.actions { display: grid; grid-template-columns: 1.15fr 1fr; gap: 8px; margin-top: 2px; }
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; font-weight: 800; font-size: 16px; padding: 14px 10px; border-radius: 14px; }
+.btn svg { width: 18px; height: 18px; }
+.btn.primary { background: var(--blue); color: var(--blue-ink); }
+.btn.ghost { background: var(--blue-soft); color: var(--blue); border: 1.5px solid var(--line); }
+.btn:focus-visible, .retry:focus-visible, .alt:focus-visible, .spot:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+.label { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+.list { display: grid; gap: 8px; }
+.alt { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; text-decoration: none; color: var(--ink); background: var(--inner); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.alt .t { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alt .d { font-weight: 700; color: var(--blue); font-variant-numeric: tabular-nums; }
+.alt .s { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.alt:hover { border-color: var(--blue); }
+
+.state { display: grid; gap: 10px; text-align: center; justify-items: center; padding: 10px 4px; }
+.state h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; }
+.state p { margin: 0; color: var(--muted); }
+.spots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.spot { font: inherit; font-size: 13px; font-weight: 500; border: 1px solid var(--line); background: var(--inner); color: var(--ink); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.spin { width: 40px; height: 40px; border-radius: 50%; border: 4px solid var(--blue-soft); border-top-color: var(--blue); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.note { font-size: 12px; color: var(--muted); text-align: center; margin: 0; }
+
+.report { display: grid; gap: 8px; }
+.rstat { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1.5px solid currentColor; }
+.chip.ok { color: var(--green); background: var(--green-soft); }
+.chip.bad { color: var(--red); background: var(--red-soft); }
+.chip.none { color: var(--muted); background: var(--inner); border-style: dashed; }
+.linkbtn { font: inherit; font-size: 13px; font-weight: 700; color: var(--blue); background: none; border: 0; padding: 2px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.rform { display: grid; gap: 10px; background: var(--inner); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.rrow { display: grid; gap: 6px; }
+.rrow > span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.opt { font: inherit; font-size: 14px; font-weight: 500; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.opt[aria-pressed="true"] { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+.send { font: inherit; font-weight: 800; font-size: 15px; border: 0; border-radius: 12px; padding: 11px; background: var(--blue); color: var(--blue-ink); cursor: pointer; }
+.send:disabled { opacity: .45; cursor: default; }
+.rmsg { font-size: 13px; color: var(--muted); margin: 0; }
+.alt .s .p { font-weight: 700; }
+.alt .s .p.ok { color: var(--green); }
+.alt .s .p.bad { color: var(--red); }
+.opt:focus-visible, .send:focus-visible, .linkbtn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+footer { font-size: 12px; color: var(--muted); text-align: center; display: grid; gap: 2px; }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <span class="pill">급똥 NFC 키링</span>
+      <h1>가장 가까운<br><mark>화장실</mark>로 안내해요</h1>
+    </div>
+    <svg class="mascot" viewBox="0 0 92 72" aria-hidden="true">
+      <rect x="6" y="12" width="60" height="44" rx="10" fill="#fff4e6" stroke="#12304f" stroke-width="2.5"/>
+      <path d="M6 48 v10 q5 5 10 0 q5 5 10 0 q5 5 10 0 q5 5 10 0 q5 5 10 0 q5 5 10 0 V48" fill="#fff4e6" stroke="#12304f" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M12 52 h48" stroke="#e0a868" stroke-width="2" stroke-dasharray="3 4"/>
+      <ellipse cx="68" cy="34" rx="14" ry="22" fill="#fff4e6" stroke="#12304f" stroke-width="2.5"/>
+      <path d="M68 34 m0 -7 a7 7 0 1 1 -6 10 a3.5 3.5 0 1 1 5 -4" fill="none" stroke="#e0a868" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="26" cy="30" r="3" fill="#12304f"/><circle cx="44" cy="30" r="3" fill="#12304f"/>
+      <path d="M29 37 q6 6 12 0" fill="none" stroke="#12304f" stroke-width="2.5" stroke-linecap="round"/>
+      <ellipse cx="20" cy="38" rx="4" ry="2.5" fill="#f6a5a0"/><ellipse cx="50" cy="38" rx="4" ry="2.5" fill="#f6a5a0"/>
+    </svg>
+  </header>
+
+  <section class="card" aria-live="polite">
+    <div id="view">
+      <div class="state">
+        <div class="spin" aria-hidden="true"></div>
+        <h2>내 위치 찾는 중</h2>
+        <p>위치 권한을 물어보면 <b>허용</b>을 눌러 주세요.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="moreCard" hidden>
+    <p class="label">여기도 가까워요</p>
+    <div class="list" id="more"></div>
+  </section>
+
+  <footer>
+    <span>데이터: 행정안전부 전국공중화장실표준데이터</span>
+    <span>개방시간과 시설 정보는 실제와 다를 수 있어요.</span>
+  </footer>
+</div>
+
+<script>
+// 제보 저장소(Supabase) 설정: 프로젝트 URL과 anon public 키를 넣으세요. 비어 있으면 제보 기능이 숨겨져요.
+var SUPABASE_URL = "https://pvewjanfxcnwmvtgnmos.supabase.co";
+var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
+</script>
+<script>
+(function () {
+  var REPORTS_ON = !!(SUPABASE_URL && SUPABASE_KEY);
+  var TYPE = ["공중화장실", "개방화장실", "간이화장실", "이동화장실"];
+  var SPOTS = [
+    ["서울시청", 37.5663, 126.9779], ["강남역", 37.4979, 127.0276], ["홍대입구역", 37.5572, 126.9245],
+    ["부산역", 35.1152, 129.0422], ["대전역", 36.3323, 127.4346], ["제주공항", 33.5070, 126.4930]
+  ];
+  var view = document.getElementById("view");
+  var moreCard = document.getElementById("moreCard");
+  var more = document.getElementById("more");
+  var index = null, tileCache = {};
+
+  var ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".15"/><path d="M12 5.5a4.5 4.5 0 0 0-4.5 4.5c0 3.4 4.5 8 4.5 8s4.5-4.6 4.5-8A4.5 4.5 0 0 0 12 5.5Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="1.6" fill="currentColor"/></svg>';
+  var ICON_TARGET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
+  var ICON_NAV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 21 3l-8 18-2-8-8-2Z"/></svg>';
+  var ICON_MAP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>';
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function dist(a, b, c, d) {
+    var R = 6371000, r = Math.PI / 180, x = (c - a) * r, y = (d - b) * r;
+    var h = Math.sin(x / 2) * Math.sin(x / 2) + Math.cos(a * r) * Math.cos(c * r) * Math.sin(y / 2) * Math.sin(y / 2);
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  function fmt(m) { return m < 1000 ? Math.round(m / 10) * 10 + "m" : (m / 1000).toFixed(1) + "km"; }
+  function walk(m) { var min = Math.max(1, Math.round(m * 1.3 / 67)); return "걸어서 약 " + min + "분"; }
+  function openState(t) {
+    var s = t[5], e = t[6];
+    if (s === -1) return { cls: "open", txt: "24시간 열림" };
+    if (s === null || s === undefined) return { cls: "unknown", txt: t[4] ? "개방 " + t[4] : "개방시간 정보 없음" };
+    var now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+    var open = e > s ? (m >= s && m < e) : (m >= s || m < e);
+    var hhmm = function (x) { return String(Math.floor(x / 60)).padStart(2, "0") + ":" + String(x % 60).padStart(2, "0"); };
+    return open ? { cls: "open", txt: "지금 열림 · " + hhmm(e) + "까지" } : { cls: "closed", txt: "지금 닫힘 · " + hhmm(s) + " 개방" };
+  }
+  function kakaoTo(t) { return "https://map.kakao.com/link/to/" + encodeURIComponent(t[2]) + "," + t[0] + "," + t[1]; }
+  function kakaoMap(t) { return "https://map.kakao.com/link/map/" + encodeURIComponent(t[2]) + "," + t[0] + "," + t[1]; }
+
+  function getJSON(url) { return fetch(url).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function loadIndex() { return index ? Promise.resolve(index) : getJSON("data/index.json").then(function (j) { index = new Set(j.tiles); return index; }); }
+  function loadTile(k) {
+    if (!tileCache[k]) tileCache[k] = index.has(k) ? getJSON("data/" + k + ".json").catch(function () { return []; }) : Promise.resolve([]);
+    return tileCache[k];
+  }
+  function nearby(lat, lng) {
+    return loadIndex().then(function () {
+      // 0.5도 단위 타일. 내가 있는 타일은 항상, 경계에서 약 4km 안이면 옆 타일도 불러와요.
+      var fy = lat * 2, fx = lng * 2, ty = Math.floor(fy), tx = Math.floor(fx), E = 0.07, keys = [];
+      var ys = [0], xs = [0];
+      if (fy - ty < E) ys.push(-1); if (ty + 1 - fy < E) ys.push(1);
+      if (fx - tx < E) xs.push(-1); if (tx + 1 - fx < E) xs.push(1);
+      ys.forEach(function (dy) { xs.forEach(function (dx) { keys.push((ty + dy) + "_" + (tx + dx)); }); });
+      return Promise.all(keys.map(loadTile));
+    }).then(function (arrs) {
+      var all = [];
+      arrs.forEach(function (a) { a.forEach(function (t) { all.push({ t: t, d: dist(lat, lng, t[0], t[1]) }); }); });
+      all.sort(function (a, b) { return a.d - b.d; });
+      return all.slice(0, 40);
+    });
+  }
+
+  // ---------- 제보 (Supabase REST) ----------
+  var reports = {};
+  function sb(path, opts) {
+    opts = opts || {};
+    opts.headers = { apikey: SUPABASE_KEY, "Content-Type": "application/json" };
+    // 예전 anon 키(JWT)일 때만 Authorization 헤더도 같이 보내요. publishable 키는 apikey 헤더만 써요.
+    if (/^eyJ/.test(SUPABASE_KEY)) opts.headers.Authorization = "Bearer " + SUPABASE_KEY;
+    return fetch(SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/" + path, opts).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.status === 201 || r.status === 204 ? null : r.json();
+    });
+  }
+  function loadReports(ids) {
+    if (!REPORTS_ON || !ids.length) return Promise.resolve();
+    var since = new Date(Date.now() - 24 * 3600e3).toISOString();
+    var q = "reports?select=toilet_id,paper,clean,created_at" +
+      "&toilet_id=in." + encodeURIComponent("(" + ids.map(function (i) { return '"' + i + '"'; }).join(",") + ")") +
+      "&created_at=gte." + encodeURIComponent(since) + "&order=created_at.desc&limit=500";
+    return sb(q).then(function (rows) {
+      ids.forEach(function (i) { reports[i] = []; });
+      rows.forEach(function (r) { (reports[r.toilet_id] = reports[r.toilet_id] || []).push(r); });
+    });
+  }
+  function summary(id) {
+    var rows = reports[id] || [];
+    if (!rows.length) return null;
+    var last = rows.find(function (r) { return r.paper !== null; });
+    var cl = rows.filter(function (r) { return r.clean; }).slice(0, 5);
+    var avg = cl.length ? cl.reduce(function (a, r) { return a + r.clean; }, 0) / cl.length : 0;
+    return { n: rows.length, paper: last ? last.paper : null, when: last ? last.created_at : rows[0].created_at,
+             clean: cl.length ? (avg >= 2.5 ? "깨끗해요" : avg >= 1.5 ? "보통이에요" : "별로예요") : "" };
+  }
+  function ago(iso) {
+    var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (m < 1) return "방금"; if (m < 60) return m + "분 전"; return Math.round(m / 60) + "시간 전";
+  }
+  function recent(id) { try { return Date.now() - (+localStorage.getItem("rep_" + id) || 0) < 10 * 60000; } catch (e) { return false; } }
+  function markSent(id) { try { localStorage.setItem("rep_" + id, String(Date.now())); } catch (e) {} }
+
+  function renderReport(t) {
+    var box = document.getElementById("rep");
+    if (!box || !REPORTS_ON) return;
+    var id = t[14], s = summary(id), chip;
+    if (s && s.paper === true) chip = '<span class="chip ok">휴지 있음 · ' + ago(s.when) + '</span>';
+    else if (s && s.paper === false) chip = '<span class="chip bad">휴지 없음 · ' + ago(s.when) + '</span>';
+    else chip = '<span class="chip none">아직 오늘 제보가 없어요</span>';
+    var extra = s ? '<span>' + s.n + '명이 알려 줬어요' + (s.clean ? ' · 청결 ' + s.clean : '') + '</span>' : '';
+    box.innerHTML = '<div class="rstat">' + chip + extra + '</div>' +
+      (recent(id) ? '<p class="rmsg">알려 주셔서 고마워요! 10분 뒤에 다시 제보할 수 있어요.</p>'
+                  : '<div><button type="button" class="linkbtn" id="openRep">다녀오셨나요? 상태 알려 주기</button></div>');
+    var ob = document.getElementById("openRep");
+    if (ob) ob.addEventListener("click", function () { openForm(t); });
+  }
+  function openForm(t) {
+    var box = document.getElementById("rep"), pick = { paper: null, clean: null };
+    box.insertAdjacentHTML("beforeend",
+      '<div class="rform" id="rform">' +
+        '<div class="rrow"><span>휴지</span><div class="opts" data-k="paper">' +
+          '<button type="button" class="opt" data-v="true" aria-pressed="false">있어요</button>' +
+          '<button type="button" class="opt" data-v="false" aria-pressed="false">없어요</button></div></div>' +
+        '<div class="rrow"><span>청결</span><div class="opts" data-k="clean">' +
+          '<button type="button" class="opt" data-v="3" aria-pressed="false">깨끗해요</button>' +
+          '<button type="button" class="opt" data-v="2" aria-pressed="false">보통</button>' +
+          '<button type="button" class="opt" data-v="1" aria-pressed="false">별로예요</button></div></div>' +
+        '<button type="button" class="send" id="send" disabled>알려 주기</button>' +
+        '<p class="rmsg" id="rmsg" hidden></p>' +
+      '</div>');
+    document.getElementById("openRep").parentNode.remove();
+    var send = document.getElementById("send"), msg = document.getElementById("rmsg");
+    box.querySelectorAll(".opts").forEach(function (g) {
+      g.addEventListener("click", function (e) {
+        var b = e.target.closest(".opt"); if (!b) return;
+        var k = g.dataset.k, v = JSON.parse(b.dataset.v);
+        pick[k] = pick[k] === v ? null : v;
+        g.querySelectorAll(".opt").forEach(function (o) { o.setAttribute("aria-pressed", JSON.parse(o.dataset.v) === pick[k] ? "true" : "false"); });
+        send.disabled = pick.paper === null && pick.clean === null;
+      });
+    });
+    send.addEventListener("click", function () {
+      send.disabled = true; send.textContent = "보내는 중…";
+      sb("reports", { method: "POST", body: JSON.stringify({ toilet_id: t[14], paper: pick.paper, clean: pick.clean }) })
+        .then(function () { markSent(t[14]); return loadReports([t[14]]); })
+        .then(function () { renderReport(t); })
+        .catch(function () {
+          send.disabled = false; send.textContent = "다시 보내기";
+          msg.hidden = false; msg.textContent = "전송에 실패했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.";
+        });
+    });
+  }
+  function paperBadge(t) {
+    var s = REPORTS_ON && summary(t[14]);
+    if (!s || s.paper === null) return "";
+    return ' · <span class="p ' + (s.paper ? "ok" : "bad") + '">' + (s.paper ? "휴지 있음" : "휴지 없음") + '</span>';
+  }
+
+  function facts(t) {
+    var f = [];
+    if (t[7] || t[8]) f.push("남 대변기 <b>" + t[7] + "</b> · 소변기 <b>" + t[8] + "</b>");
+    if (t[9]) f.push("여 대변기 <b>" + t[9] + "</b>");
+    if (t[10]) f.push("장애인 칸");
+    if (t[11]) f.push("기저귀 교환대");
+    if (t[12]) f.push("비상벨");
+    return f.map(function (x) { return "<span>" + x + "</span>"; }).join("");
+  }
+
+  function render(list, label) {
+    if (!list.length) {
+      showError("근처 화장실이 없어요", "이 주변 2~3km 안에는 등록된 화장실이 없어요. 지도 앱에서 직접 찾아보세요.");
+      return;
+    }
+    // Recommend the nearest place that isn't known to be closed right now.
+    var bestIdx = list.findIndex(function (x) { return openState(x.t).cls !== "closed"; });
+    if (bestIdx < 0) bestIdx = 0;
+    var best = list[bestIdx], t = best.t, st = openState(t);
+    view.innerHTML =
+      '<div class="best">' +
+        '<div class="toprow"><span class="from">' + ICON_PIN + esc(label) + '</span>' +
+        '<button type="button" class="retry" id="retry">' + ICON_TARGET + '다시 찾기</button></div>' +
+        '<div class="name"><h2>' + esc(t[2]) + '</h2><span class="tag">' + TYPE[t[3]] + '</span></div>' +
+        '<div class="dist"><span class="m">직선 ' + fmt(best.d) + '</span><span class="walk">' + walk(best.d) + '</span></div>' +
+        '<div><span class="status ' + st.cls + '">' + esc(st.txt) + '</span></div>' +
+        (REPORTS_ON ? '<div class="report" id="rep"><div class="rstat"><span class="chip none">제보 불러오는 중</span></div></div>' : '') +
+        (facts(t) ? '<div class="facts">' + facts(t) + '</div>' : '') +
+        '<div class="addr">' + esc(t[13]) + '</div>' +
+        '<div class="actions">' +
+          '<a class="btn primary" target="_blank" rel="noopener" href="' + kakaoTo(t) + '">' + ICON_NAV + '길 안내</a>' +
+          '<a class="btn ghost" target="_blank" rel="noopener" href="' + kakaoMap(t) + '">' + ICON_MAP + '지도 보기</a>' +
+        '</div>' +
+      '</div>';
+    document.getElementById("retry").addEventListener("click", locate);
+
+    var rest = list.filter(function (_, i) { return i !== bestIdx; }).slice(0, 5);
+    function drawMore() {
+      more.innerHTML = rest.map(function (x) {
+        var s = openState(x.t);
+        return '<a class="alt" target="_blank" rel="noopener" href="' + kakaoTo(x.t) + '">' +
+          '<span class="t">' + esc(x.t[2]) + '</span><span class="d">' + fmt(x.d) + '</span>' +
+          '<span class="s">' + TYPE[x.t[3]] + ' · ' + esc(s.txt) + paperBadge(x.t) + '</span></a>';
+      }).join("");
+    }
+    drawMore();
+    moreCard.hidden = rest.length === 0;
+    if (REPORTS_ON) {
+      loadReports([t[14]].concat(rest.map(function (x) { return x.t[14]; })))
+        .then(function () { renderReport(t); drawMore(); })
+        .catch(function () {
+          var box = document.getElementById("rep");
+          if (box) box.innerHTML = '<p class="rmsg">제보 정보를 불러오지 못했어요.</p>';
+        });
+    }
+  }
+
+  function showLoading(msg) {
+    moreCard.hidden = true;
+    view.innerHTML = '<div class="state"><div class="spin" aria-hidden="true"></div><h2>' + esc(msg) + '</h2></div>';
+  }
+  function showError(title, msg) {
+    moreCard.hidden = true;
+    view.innerHTML = '<div class="state"><h2>' + esc(title) + '</h2><p>' + esc(msg) + '</p>' +
+      '<button type="button" class="spot" id="again">위치 다시 받기</button>' +
+      '<p class="note">아니면 아래 장소로 둘러보세요</p><div class="spots">' +
+      SPOTS.map(function (s, i) { return '<button type="button" class="spot" data-i="' + i + '">' + s[0] + '</button>'; }).join("") +
+      '</div></div>';
+    document.getElementById("again").addEventListener("click", locate);
+    view.querySelectorAll("[data-i]").forEach(function (b) {
+      b.addEventListener("click", function () { var s = SPOTS[+b.dataset.i]; findAt(s[1], s[2], s[0] + " 근처"); });
+    });
+  }
+  function findAt(lat, lng, label) {
+    showLoading("화장실 찾는 중");
+    nearby(lat, lng).then(function (list) { render(list, label); })
+      .catch(function () { showError("데이터를 못 불러왔어요", "인터넷 연결을 확인하고 다시 시도해 주세요."); });
+  }
+  function locate() {
+    loadIndex().catch(function () {});
+    if (!navigator.geolocation) { showError("위치를 쓸 수 없어요", "이 브라우저는 위치 기능을 지원하지 않아요."); return; }
+    showLoading("내 위치 찾는 중");
+    navigator.geolocation.getCurrentPosition(
+      function (p) { findAt(p.coords.latitude, p.coords.longitude, "가까운 화장실부터"); },
+      function (e) {
+        if (e.code === 1) showError("위치 권한이 꺼져 있어요", "브라우저 설정에서 이 사이트의 위치 권한을 허용하면 바로 찾아 드려요.");
+        else showError("위치를 못 받았어요", "실내라면 창가로 가거나, 잠시 후 다시 시도해 주세요.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }
+  locate();
+})();
+</script>
+
+</html>
