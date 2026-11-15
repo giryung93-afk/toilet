@@ -134,6 +134,7 @@ h1 mark { background: var(--yellow); color: #12304f; padding: 0 8px; border-radi
 .alt .s .p.bad { color: var(--red); }
 .opt:focus-visible, .send:focus-visible, .linkbtn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 footer { font-size: 12px; color: var(--muted); text-align: center; display: grid; gap: 2px; }
+footer a { color: inherit; }
 @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
 </style>
 
@@ -172,6 +173,7 @@ footer { font-size: 12px; color: var(--muted); text-align: center; display: grid
 
   <footer>
     <span>데이터: 행정안전부 전국공중화장실표준데이터</span>
+    <span>일본: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)</span>
     <span>개방시간과 시설 정보는 실제와 다를 수 있어요.</span>
   </footer>
 </div>
@@ -184,10 +186,11 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
 <script>
 (function () {
   var REPORTS_ON = !!(SUPABASE_URL && SUPABASE_KEY);
-  var TYPE = ["공중화장실", "개방화장실", "간이화장실", "이동화장실"];
+  var TYPE = ["공중화장실", "개방화장실", "간이화장실", "이동화장실", "도쿄", "도쿄 · 이용객 전용"];
   var SPOTS = [
     ["서울시청", 37.5663, 126.9779], ["강남역", 37.4979, 127.0276], ["홍대입구역", 37.5572, 126.9245],
-    ["부산역", 35.1152, 129.0422], ["대전역", 36.3323, 127.4346], ["제주공항", 33.5070, 126.4930]
+    ["부산역", 35.1152, 129.0422], ["대전역", 36.3323, 127.4346], ["제주공항", 33.5070, 126.4930],
+    ["도쿄역", 35.6812, 139.7671], ["시부야역", 35.6580, 139.7016]
   ];
   var view = document.getElementById("view");
   var moreCard = document.getElementById("moreCard");
@@ -216,8 +219,16 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
     var hhmm = function (x) { return String(Math.floor(x / 60)).padStart(2, "0") + ":" + String(x % 60).padStart(2, "0"); };
     return open ? { cls: "open", txt: "지금 열림 · " + hhmm(e) + "까지" } : { cls: "closed", txt: "지금 닫힘 · " + hhmm(s) + " 개방" };
   }
-  function kakaoTo(t) { return "https://map.kakao.com/link/to/" + encodeURIComponent(t[2]) + "," + t[0] + "," + t[1]; }
-  function kakaoMap(t) { return "https://map.kakao.com/link/map/" + encodeURIComponent(t[2]) + "," + t[0] + "," + t[1]; }
+  // 한국 화장실은 카카오맵, 해외(OpenStreetMap, id가 "osm:"로 시작) 화장실은 구글맵으로 연결해요.
+  function abroad(t) { return String(t[14] || "").indexOf("osm:") === 0; }
+  function kakaoTo(t) {
+    if (abroad(t)) return "https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=" + t[0] + "," + t[1];
+    return "https://map.kakao.com/link/to/" + encodeURIComponent(t[2]) + "," + t[0] + "," + t[1];
+  }
+  function kakaoMap(t) {
+    if (abroad(t)) return "https://www.google.com/maps/search/?api=1&query=" + t[0] + "," + t[1];
+    return "https://map.kakao.com/link/map/" + encodeURIComponent(t[2]) + "," + t[0] + "," + t[1];
+  }
 
   function getJSON(url) { return fetch(url).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
   function loadIndex() { return index ? Promise.resolve(index) : getJSON("data/index.json").then(function (j) { index = new Set(j.tiles); return index; }); }
@@ -365,7 +376,7 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
         '<div><span class="status ' + st.cls + '">' + esc(st.txt) + '</span></div>' +
         (REPORTS_ON ? '<div class="report" id="rep"><div class="rstat"><span class="chip none">제보 불러오는 중</span></div></div>' : '') +
         (facts(t) ? '<div class="facts">' + facts(t) + '</div>' : '') +
-        '<div class="addr">' + esc(t[13]) + '</div>' +
+        (t[13] ? '<div class="addr">' + esc(t[13]) + '</div>' : '') +
         '<div class="actions">' +
           '<a class="btn primary" target="_blank" rel="noopener" href="' + kakaoTo(t) + '">' + ICON_NAV + '길 안내</a>' +
           '<a class="btn ghost" target="_blank" rel="noopener" href="' + kakaoMap(t) + '">' + ICON_MAP + '지도 보기</a>' +
