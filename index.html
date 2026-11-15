@@ -186,7 +186,15 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
 <script>
 (function () {
   var REPORTS_ON = !!(SUPABASE_URL && SUPABASE_KEY);
-  var TYPE = ["공중화장실", "개방화장실", "간이화장실", "이동화장실", "도쿄", "도쿄 · 이용객 전용"];
+  // 0~3: 한국 데이터 구분, 4~10: 도쿄(OpenStreetMap) 종류
+  var TYPE = ["공중화장실", "개방화장실", "간이화장실", "이동화장실",
+              "공중화장실", "이용객 전용 화장실", "역 화장실", "공원 화장실", "간이 화장실", "건물 안 화장실", "화장실"];
+  // 이름이 없는 곳은 종류 이름을 제목으로 쓰고, 태그에는 "도쿄"만 붙여요. 이름이 있으면 태그에 종류를 보여줘요.
+  function title(t) { return t[2] || TYPE[t[3]]; }
+  function tagOf(t) {
+    if (t[3] < 4) return TYPE[t[3]];
+    return t[2] ? TYPE[t[3]] + " · 도쿄" : "도쿄";
+  }
   var SPOTS = [
     ["서울시청", 37.5663, 126.9779], ["강남역", 37.4979, 127.0276], ["홍대입구역", 37.5572, 126.9245],
     ["부산역", 35.1152, 129.0422], ["대전역", 36.3323, 127.4346], ["제주공항", 33.5070, 126.4930],
@@ -378,7 +386,7 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
       '<div class="best">' +
         '<div class="toprow"><span class="from">' + ICON_PIN + esc(label) + '</span>' +
         '<button type="button" class="retry" id="retry">' + ICON_TARGET + '다시 찾기</button></div>' +
-        '<div class="name"><h2>' + esc(t[2]) + '</h2><span class="tag">' + TYPE[t[3]] + '</span></div>' +
+        '<div class="name"><h2>' + esc(title(t)) + '</h2><span class="tag">' + esc(tagOf(t)) + '</span></div>' +
         '<div class="dist"><span class="m">직선 ' + fmt(best.d) + '</span><span class="walk">' + walk(best.d) + '</span></div>' +
         '<div><span class="status ' + st.cls + '">' + esc(st.txt) + '</span></div>' +
         (REPORTS_ON ? '<div class="report" id="rep"><div class="rstat"><span class="chip none">제보 불러오는 중</span></div></div>' : '') +
@@ -396,8 +404,8 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
       more.innerHTML = rest.map(function (x) {
         var s = openState(x.t);
         return '<a class="alt" target="_blank" rel="noopener" href="' + kakaoTo(x.t) + '">' +
-          '<span class="t">' + esc(x.t[2]) + '</span><span class="d">' + fmt(x.d) + '</span>' +
-          '<span class="s">' + TYPE[x.t[3]] + ' · ' + esc(s.txt) + paperBadge(x.t) + '</span></a>';
+          '<span class="t">' + esc(title(x.t)) + '</span><span class="d">' + fmt(x.d) + '</span>' +
+          '<span class="s">' + esc(tagOf(x.t)) + ' · ' + esc(s.txt) + paperBadge(x.t) + '</span></a>';
       }).join("");
     }
     drawMore();
