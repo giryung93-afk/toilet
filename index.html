@@ -196,6 +196,7 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
   var moreCard = document.getElementById("moreCard");
   var more = document.getElementById("more");
   var index = null, tileCache = {};
+  var here = null; // 마지막으로 찾은 내 위치 [위도, 경도]. 길 안내 출발지로 써요.
 
   var ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".15"/><path d="M12 5.5a4.5 4.5 0 0 0-4.5 4.5c0 3.4 4.5 8 4.5 8s4.5-4.6 4.5-8A4.5 4.5 0 0 0 12 5.5Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="1.6" fill="currentColor"/></svg>';
   var ICON_TARGET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
@@ -221,9 +222,15 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
   }
   // 한국 화장실은 카카오맵, 해외(OpenStreetMap, id가 "osm:"로 시작) 화장실은 구글맵으로 연결해요.
   function abroad(t) { return String(t[14] || "").indexOf("osm:") === 0; }
+  // 길 안내: 출발지를 방금 찾은 내 위치로 지정해서, 지도 앱이 열리자마자 내 위치 → 화장실 경로가 나오게 해요.
   function kakaoTo(t) {
-    if (abroad(t)) return "https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=" + t[0] + "," + t[1];
-    return "https://map.kakao.com/link/to/" + encodeURIComponent(t[2]) + "," + t[0] + "," + t[1];
+    if (abroad(t)) {
+      return "https://www.google.com/maps/dir/?api=1&travelmode=walking" +
+        (here ? "&origin=" + here[0] + "," + here[1] : "") +
+        "&destination=" + t[0] + "," + t[1];
+    }
+    var to = "to/" + encodeURIComponent(t[2]) + "," + t[0] + "," + t[1];
+    return "https://map.kakao.com/link/" + (here ? "from/" + encodeURIComponent("내 위치") + "," + here[0] + "," + here[1] + "/" : "") + to;
   }
   function kakaoMap(t) {
     if (abroad(t)) return "https://www.google.com/maps/search/?api=1&query=" + t[0] + "," + t[1];
@@ -422,6 +429,7 @@ var SUPABASE_KEY = "sb_publishable_hQWTfIe6ldnf-HSnJf4kUg__tu4XP03";
     });
   }
   function findAt(lat, lng, label) {
+    here = [lat, lng];
     showLoading("화장실 찾는 중");
     nearby(lat, lng).then(function (list) { render(list, label); })
       .catch(function () { showError("데이터를 못 불러왔어요", "인터넷 연결을 확인하고 다시 시도해 주세요."); });
